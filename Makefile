@@ -1,4 +1,5 @@
 CXXFLAGS = -O3 -g0
+# -DTRACE  
 LDFLAGS = $(CXXFLAGS)
 
 dnsseed: dns.o coingreen.o netbase.o protocol.o db.o main.o util.o
