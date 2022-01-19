@@ -14,7 +14,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up environment
-        run: sudo apt install libboost-container-dev
+        run: sudo apt install libboost-dev
 
       - name: Build
         run: make -j4
