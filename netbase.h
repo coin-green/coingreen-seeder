@@ -1,8 +1,9 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
+// Copyright (c) 2022 CoinGreen core developers
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef BITCOIN_NETBASE_H
-#define BITCOIN_NETBASE_H
+#ifndef COINGREEN_NETBASE_H
+#define COINGREEN_NETBASE_H
 
 #include <string>
 #include <vector>

@@ -1,0 +1,20 @@
+name: Ubuntu
+
+on:
+  push:
+
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Set up environment
+        run: sudo apt install libboost-dev
+
+      - name: Build
+        run: make -j4

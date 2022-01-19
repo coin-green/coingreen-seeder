@@ -6,7 +6,7 @@
 #include "serialize.h"
 #include "uint256.h"
 
-#define BITCOIN_SEED_NONCE  0x0539a019ca550825
+#define COINGREEN_SEED_NONCE  0x0539a019ca550825
 
 using namespace std;
 
@@ -36,7 +36,9 @@ class CNode {
     nHeaderStart = vSend.size();
     vSend << CMessageHeader(pszCommand, 0);
     nMessageStart = vSend.size();
-//    printf("%s: SEND %s\n", ToString(you).c_str(), pszCommand); 
+#ifdef TRACE
+    printf("%s: SEND %s\n", ToString(you).c_str(), pszCommand); 
+#endif
   }
   
   void AbortMessage() {
@@ -75,18 +77,20 @@ class CNode {
   
   void PushVersion() {
     int64 nTime = time(NULL);
-    uint64 nLocalNonce = BITCOIN_SEED_NONCE;
+    uint64 nLocalNonce = COINGREEN_SEED_NONCE;
     int64 nLocalServices = 0;
     CAddress me(CService("0.0.0.0"));
     BeginMessage("version");
     int nBestHeight = GetRequireHeight();
-    string ver = "/dogecoin-seeder:0.01/";
+    string ver = "/CoinGreen-seeder:0.01/";
     vSend << PROTOCOL_VERSION << nLocalServices << nTime << you << me << nLocalNonce << ver << nBestHeight;
     EndMessage();
   }
  
   void GotVersion() {
-    // printf("\n%s: version %i\n", ToString(you).c_str(), nVersion);
+#ifdef TRACE
+    printf("\n%s: version %i\n", ToString(you).c_str(), nVersion);
+#endif    
     if (vAddr) {
       BeginMessage("getaddr");
       EndMessage();
@@ -97,7 +101,9 @@ class CNode {
   }
 
   bool ProcessMessage(string strCommand, CDataStream& vRecv) {
-//    printf("%s: RECV %s\n", ToString(you).c_str(), strCommand.c_str());
+#ifdef TRACE
+    printf("%s: RECV %s\n", ToString(you).c_str(), strCommand.c_str());
+#endif    
     if (strCommand == "version") {
       int64 nTime;
       CAddress addrMe;
@@ -133,19 +139,25 @@ class CNode {
     if (strCommand == "addr" && vAddr) {
       vector<CAddress> vAddrNew;
       vRecv >> vAddrNew;
-      // printf("%s: got %i addresses\n", ToString(you).c_str(), (int)vAddrNew.size());
+#ifdef TRACE
+       printf("%s: got %i addresses\n", ToString(you).c_str(), (int)vAddrNew.size());
+#endif
       int64 now = time(NULL);
       vector<CAddress>::iterator it = vAddrNew.begin();
       if (doneAfter == 0 || doneAfter > now + 1) doneAfter = now + 1;
       while (it != vAddrNew.end()) {
         CAddress &addr = *it;
-//        printf("%s: got address %s\n", ToString(you).c_str(), addr.ToString().c_str(), (int)(vAddr->size()));
+#ifdef TRACE
+        printf("%s: got address %s\n", ToString(you).c_str(), addr.ToString().c_str());
+#endif
         it++;
         if (addr.nTime <= 100000000 || addr.nTime > now + 600)
           addr.nTime = now - 5 * 86400;
         if (addr.nTime > now - 604800)
           vAddr->push_back(addr);
-//        printf("%s: added address %s (#%i)\n", ToString(you).c_str(), addr.ToString().c_str(), (int)(vAddr->size()));
+#ifdef TRACE
+        printf("%s: added address %s (#%i)\n", ToString(you).c_str(), addr.ToString().c_str(), (int)(vAddr->size()));
+#endif
         if (vAddr->size() > 1000) {doneAfter = 1; return true; }
       }
       return false;
@@ -170,13 +182,17 @@ class CNode {
       CMessageHeader hdr;
       vRecv >> hdr;
       if (!hdr.IsValid()) { 
-        // printf("%s: BAD (invalid header)\n", ToString(you).c_str());
+#ifdef TRACE
+        printf("%s: BAD (invalid header)\n", ToString(you).c_str());
+#endif        
         ban = 100000; return true;
       }
       string strCommand = hdr.GetCommand();
       unsigned int nMessageSize = hdr.nMessageSize;
       if (nMessageSize > MAX_SIZE) { 
-        // printf("%s: BAD (message too large)\n", ToString(you).c_str());
+#ifdef TRACE
+        printf("%s: BAD (message too large)\n", ToString(you).c_str());
+#endif
         ban = 100000;
         return true; 
       }
@@ -194,7 +210,10 @@ class CNode {
       vRecv.ignore(nMessageSize);
       if (ProcessMessage(strCommand, vMsg))
         return true;
-//      printf("%s: done processing %s\n", ToString(you).c_str(), strCommand.c_str());
+#ifdef TRACE
+      printf("%s: done processing %s\n", ToString(you).c_str(), strCommand.c_str());
+#endif
+
     } while(1);
     return false;
   }
@@ -240,11 +259,15 @@ public:
         vRecv.resize(nPos + nBytes);
         memcpy(&vRecv[nPos], pchBuf, nBytes);
       } else if (nBytes == 0) {
-        // printf("%s: BAD (connection closed prematurely)\n", ToString(you).c_str());
+#ifdef TRACE
+        printf("%s: BAD (connection closed prematurely)\n", ToString(you).c_str());
+#endif
         res = false;
         break;
       } else {
-        // printf("%s: BAD (connection error)\n", ToString(you).c_str());
+#ifdef TRACE
+        printf("%s: BAD (connection error)\n", ToString(you).c_str());
+#endif
         res = false;
         break;
       }
@@ -286,7 +309,9 @@ bool TestNode(const CService &cip, int &ban, int &clientV, std::string &clientSV
     clientV = node.GetClientVersion();
     clientSV = node.GetClientSubVersion();
     blocks = node.GetStartingHeight();
-//  printf("%s: %s!!!\n", cip.ToString().c_str(), ret ? "GOOD" : "BAD");
+#ifdef TRACE
+  printf("%s: %s!!!\n", cip.ToString().c_str(), ret ? "GOOD" : "BAD");
+#endif
     return ret;
   } catch(std::ios_base::failure& e) {
     ban = 0;
