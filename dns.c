@@ -287,7 +287,9 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
   unsigned char *outpos = outbuf+(inpos-inbuf);
   unsigned char *outend = outbuf + BUFLEN;
   
-  // printf("DNS: Request host='%s' type=%i class=%i\n", name, typ, cls);
+#ifdef TRACE
+  printf("DNS: Request host='%s' type=%i class=%i\n", name, typ, cls);
+#endif
   
   // calculate size of authority section
   
@@ -298,7 +300,9 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
     unsigned char *oldpos = outpos;
     write_record_ns(&oldpos, outend, "", offset, CLASS_IN, 0, opt->ns);
     auth_size = oldpos - outpos;
-//    printf("Authority section will claim %i bytes\n", auth_size);
+#ifdef TRACE
+    printf("Authority section will claim %i bytes\n", auth_size);
+#endif
   }
   
   // Answer section
@@ -308,14 +312,18 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
   // NS records
   if ((typ == TYPE_NS || typ == QTYPE_ANY) && (cls == CLASS_IN || cls == QCLASS_ANY)) {
     int ret2 = write_record_ns(&outpos, outend - auth_size, "", offset, CLASS_IN, opt->nsttl, opt->ns);
-//    printf("wrote NS record: %i\n", ret2);
+#ifdef TRACE
+    printf("wrote NS record: %i\n", ret2);
+#endif
     if (!ret2) { outbuf[7]++; have_ns++; }
   }
 
   // SOA records
   if ((typ == TYPE_SOA || typ == QTYPE_ANY) && (cls == CLASS_IN || cls == QCLASS_ANY) && opt->mbox) {
     int ret2 = write_record_soa(&outpos, outend - auth_size, "", offset, CLASS_IN, opt->nsttl, opt->ns, opt->mbox, time(NULL), 604800, 86400, 2592000, 604800);
-//    printf("wrote SOA record: %i\n", ret2);
+#ifdef TRACE
+    printf("wrote SOA record: %i\n", ret2);
+#endif
     if (!ret2) { outbuf[7]++; }
   }
   
@@ -330,7 +338,9 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
          ret = write_record_a(&outpos, outend - auth_size, "", offset, CLASS_IN, opt->datattl, &addr[n]);
       else if (addr[n].v == 6)
          ret = write_record_aaaa(&outpos, outend - auth_size, "", offset, CLASS_IN, opt->datattl, &addr[n]);
-//      printf("wrote A record: %i\n", ret);
+#ifdef TRACE
+      printf("wrote A record: %i\n", ret);
+#endif
       if (!ret) {
         n++;
         outbuf[7]++;
@@ -342,7 +352,9 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
   // Authority section
   if (!have_ns) {
     int ret2 = write_record_ns(&outpos, outend, "", offset, CLASS_IN, opt->nsttl, opt->ns);
-//    printf("wrote NS record: %i\n", ret2);
+#ifdef TRACE
+    printf("wrote NS record: %i\n", ret2);
+#endif
     if (!ret2) {
       outbuf[9]++;
     }
@@ -390,7 +402,10 @@ int dnsserver(dns_opt_t *opt) {
     memset((char *) &si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
     si_me.sin_port = htons(opt->port);
-    si_me.sin_addr.s_addr = INADDR_ANY;
+    if (opt->addr) 
+      inet_pton(AF_INET, opt->addr, &(si_me.sin_addr));
+    else 
+      si_me.sin_addr.s_addr = INADDR_ANY;
     if (bind(listenSocket, (struct sockaddr*)&si_me, sizeof(si_me))==-1)
       return -2;
   }
@@ -415,7 +430,9 @@ int dnsserver(dns_opt_t *opt) {
   {
     ssize_t insize = recvmsg(listenSocket, &msg, 0);
     unsigned char *addr = (unsigned char*)&si_other.sin_addr.s_addr;
-//    printf("DNS: Request %llu from %i.%i.%i.%i:%i of %i bytes\n", (unsigned long long)(opt->nRequests), addr[0], addr[1], addr[2], addr[3], ntohs(si_other.sin_port), (int)insize);
+#ifdef TRACE
+    printf("DNS: Request %llu from %i.%i.%i.%i:%i of %i bytes\n", (unsigned long long)(opt->nRequests), addr[0], addr[1], addr[2], addr[3], ntohs(si_other.sin_port), (int)insize);
+#endif
     if (insize <= 0)
       continue;
 

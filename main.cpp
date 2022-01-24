@@ -11,6 +11,10 @@
 #include "coingreen.h"
 #include "db.h"
 
+// If the number of nodes is above this value turn on rundomizer
+// Else report all nodes
+#define RUNDOMIZER_THRESHOLD 25
+
 using namespace std;
 
 bool fTestNet = false;
@@ -24,15 +28,16 @@ public:
   int fWipeBan;
   int fWipeIgnore;
   const char *mbox;
+  const char *addr;
   const char *ns;
   const char *host;
   const char *tor;
 
-  CDnsSeedOpts() : nThreads(96), nDnsThreads(4), nPort(53), mbox(NULL), ns(NULL), host(NULL), tor(NULL), fUseTestNet(false), fWipeBan(false), fWipeIgnore(false) {}
+  CDnsSeedOpts() : nThreads(96), nDnsThreads(4), nPort(53), mbox(NULL), ns(NULL), host(NULL), addr(NULL), tor(NULL), fUseTestNet(false), fWipeBan(false), fWipeIgnore(false) {}
 
   void ParseCommandLine(int argc, char **argv) {
     static const char *help = "CoinGreen-seeder\n"
-                              "Usage: %s -h <host> -n <ns> [-m <mbox>] [-t <threads>] [-p <port>]\n"
+                              "Usage: %s -h <host> -n <ns> [-m <mbox>] [-t <threads>] [-p <port>] [-a <addr>]\n"
                               "\n"
                               "Options:\n"
                               "-h <host>       Hostname of the DNS seed\n"
@@ -40,6 +45,7 @@ public:
                               "-m <mbox>       E-Mail address reported in SOA records\n"
                               "-t <threads>    Number of crawlers to run in parallel (default 96)\n"
                               "-d <threads>    Number of DNS server threads (default 4)\n"
+                              "-a <addr>       IP address to listen on (default - all)\n"
                               "-p <port>       UDP port to listen on (default 53)\n"
                               "-o <ip:port>    Tor proxy IP/Port\n"
                               "--testnet       Use testnet\n"
@@ -57,6 +63,7 @@ public:
         {"threads", required_argument, 0, 't'},
         {"dnsthreads", required_argument, 0, 'd'},
         {"port", required_argument, 0, 'p'},
+        {"addr", required_argument, 0, 'a'},
         {"onion", required_argument, 0, 'o'},
         {"testnet", no_argument, &fUseTestNet, 1},
         {"wipeban", no_argument, &fWipeBan, 1},
@@ -65,7 +72,7 @@ public:
         {0, 0, 0, 0}
       };
       int option_index = 0;
-      int c = getopt_long(argc, argv, "h:n:m:t:p:d:o:?", long_options, &option_index);
+      int c = getopt_long(argc, argv, "h:n:m:t:p:a:d:o:?", long_options, &option_index);
       if (c == -1) break;
       switch (c) {
         case 'h': {
@@ -83,6 +90,11 @@ public:
           break;
         }
         
+        case 'a': {
+          addr = optarg;
+          break;
+        }
+
         case 't': {
           int n = strtol(optarg, NULL, 10);
           if (n > 0 && n < 1000) nThreads = n;
@@ -191,6 +203,10 @@ public:
           memcpy(&a.data.v4, &addr, 4);
           cache.push_back(a);
           nIPv4++;
+#ifdef TRACE    
+    printf("------ nIPv4=%d\n", nIPv4); 
+#endif
+
 #ifdef USE_IPV6
         } else if ((*it).GetIn6Addr(&addr6)) {
           addr_t a;
@@ -208,6 +224,7 @@ public:
 
   CDnsThread(CDnsSeedOpts* opts, int idIn) : id(idIn) {
     dns_opt.host = opts->host;
+    dns_opt.addr = opts->addr;
     dns_opt.ns = opts->ns;
     dns_opt.mbox = opts->mbox;
     dns_opt.datattl = 60;
@@ -241,8 +258,11 @@ extern "C" int GetIPList(void *data, addr_t* addr, int max, int ipv4, int ipv6) 
     max = maxmax;
   int i=0;
   while (i<max) {
-    int j = i + (rand() % (size - i));
+    int j = i + ((size > RUNDOMIZER_THRESHOLD) ? (rand() % (size - i)) : 0);
     do {
+#ifdef TRACE    
+    printf("------ i=%d, j=%d, size=%d\n", i, j, size); 
+#endif
         bool ok = (ipv4 && thread->cache[j].v == 4) || 
                   (ipv6 && thread->cache[j].v == 6);
         if (ok) break;
@@ -344,7 +364,7 @@ extern "C" void* ThreadStats(void*) {
 }
 
 //TODO: We don't have any other seeds yet. Add them in next revision.
-static const string mainnet_seeds[] = {"18.195.27.6", "35.183.50.52", "3.113.35.242", ""};
+static const string mainnet_seeds[] = {""};
 static const string testnet_seeds[] = {""};
 static const string *seeds = mainnet_seeds;
 
@@ -408,7 +428,7 @@ int main(int argc, char **argv) {
   }
   pthread_t threadDns, threadSeed, threadDump, threadStats;
   if (fDNS) {
-    printf("Starting %i DNS threads for %s on %s (port %i)...", opts.nDnsThreads, opts.host, opts.ns, opts.nPort);
+    printf("Starting %i DNS threads for %s on %s (addr %s:%i)...", opts.nDnsThreads, opts.host, opts.ns, (opts.addr ? opts.addr : "ANY"), opts.nPort);
     dnsThread.clear();
     for (int i=0; i<opts.nDnsThreads; i++) {
       dnsThread.push_back(new CDnsThread(&opts, i));

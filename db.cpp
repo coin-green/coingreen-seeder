@@ -196,10 +196,10 @@ void CAddrDb::GetIPs_(set<CNetAddr>& ips, int max, const bool* nets) {
     }
     return;
   }
-  if (max > goodId.size() / 2)
-    max = goodId.size() / 2;
-  if (max < 1)
-    max = 1;
+  
+  if (max > goodId.size())
+    max = goodId.size();
+
   int low = *goodId.begin();
   int high = *goodId.rbegin();
   set<int> ids;
